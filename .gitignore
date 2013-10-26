@@ -1,0 +1,242 @@
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using Microsoft.Research.Kinect.Nui;
+using Coding4Fun.Kinect.WinForm;
+
+namespace Signotron_5000
+{
+    public partial class Form1 : Form
+    {
+        bool paint = false;
+        //bool LeftorRight = true;
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        Runtime nui = Runtime.Kinects[0];
+        float oldx, oldy;
+        //Line myLine2;
+        bool draw;
+        bool start = false;
+        bool LorR = true;
+        //Point[] point = new Point[11];
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            nui.Initialize(RuntimeOptions.UseColor | RuntimeOptions.UseSkeletalTracking);
+            nui.SkeletonEngine.TransformSmooth = true;
+            var parameters = new TransformSmoothParameters
+            {
+                Smoothing = 0.85f,//0.75
+                Correction = 0.06f,//0.0
+                Prediction = 0.05f,//0.0
+                JitterRadius = 0.001f,//0.05
+                MaxDeviationRadius = 0.04f//0.04
+            };
+            draw = false;
+            nui.SkeletonEngine.SmoothParameters = parameters;
+            nui.SkeletonFrameReady += new EventHandler<SkeletonFrameReadyEventArgs>(nui_SkeletonFrameReady);
+
+        }
+
+        void nui_SkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
+        {
+            SkeletonFrame allSkeleton = e.SkeletonFrame;
+            SkeletonData skeleton = GetSkeleton(allSkeleton.Skeletons);
+            if (skeleton != null)
+            {
+                DrawSkeleton(skeleton);
+                if (start)
+                {
+                    //hand.Visible = true;
+                    if (LorR)
+                    {
+                        if (skeleton.Joints[JointID.HandLeft].Position.Z < skeleton.Joints[JointID.HandRight].Position.Z)
+                        {
+                            paint = false;
+                            draw = false;
+                        }
+                        else paint = true;
+                        if (paint)
+                        {
+                            KinectDraw(skeleton.Joints[JointID.HandRight]);
+                        }
+                    }
+                    else
+                    {
+                        if (skeleton.Joints[JointID.HandLeft].Position.Z > skeleton.Joints[JointID.HandRight].Position.Z)
+                        {
+                            paint = false;
+                            draw = false;
+                        }
+                        else paint = true;
+                        if (paint)
+                        {
+                            KinectDraw(skeleton.Joints[JointID.HandLeft]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Graphics g2 = panel2.CreateGraphics();
+                g2.Clear(panel2.BackColor);
+            }
+        }
+
+        SkeletonData GetSkeleton(SkeletonData[] skeletons)
+        {
+            SkeletonData Skeleton = null;
+            if (skeletons != null)
+            {
+                for (int i = 0; i < skeletons.Length; i++)
+                {
+                    if (skeletons[i].TrackingState == SkeletonTrackingState.Tracked)
+                    {
+                        if (Skeleton == null)
+                        {
+                            Skeleton = skeletons[i];
+                        }
+                        else
+                        {
+                            if (Skeleton.Position.Z > skeletons[i].Position.Z)
+                            {
+                                Skeleton = skeletons[i];
+                            }
+                        }
+                    }
+                }
+            }
+            return Skeleton;
+        }
+
+ 
+?
+       void DrawSkeleton(SkeletonData skeleton)
+        {
+            
+            Graphics g2 = panel2.CreateGraphics();
+            //g2.Clear(panel1.BackColor);
+            panel2.Refresh();
+            Pen backColorPen = new Pen(panel2.BackColor, 3);
+            //g2.DrawLines(backColorPen, point); 
+            Pen blackPen = new Pen(Color.Black, 3);
+            Pen greenPen = new Pen(Color.Blue, 3);
+            JointID[] joint ={JointID.Head,JointID.ShoulderCenter,JointID.ShoulderLeft,
+                             JointID.Spine,JointID.ShoulderRight,JointID.ShoulderCenter,
+                             JointID.HipCenter,JointID.HipLeft,JointID.Spine,
+                             JointID.HipRight,JointID.HipCenter};
+            DrawSkeletonLine(skeleton,joint, 11);
+            JointID[] joint2 ={JointID.HipLeft,JointID.KneeLeft,
+                              JointID.AnkleLeft,JointID.FootLeft};
+            DrawSkeletonLine(skeleton, joint2, 4);
+            JointID[] joint3 ={JointID.HipRight,JointID.KneeRight,
+                              JointID.AnkleRight,JointID.FootRight};
+            DrawSkeletonLine(skeleton, joint3, 4);
+            JointID[] joint4 ={JointID.ShoulderLeft,JointID.ElbowLeft,
+                              JointID.WristLeft,JointID.HandLeft};
+            DrawSkeletonLine(skeleton, joint4, 4);
+            JointID[] joint5 ={JointID.ShoulderRight,JointID.ElbowRight,
+                              JointID.WristRight,JointID.HandRight};
+            DrawSkeletonLine(skeleton, joint5, 4);
+            //System.Threading.Thread.Sleep(50);       
+        }
+
+        Point getJointPoint(Joint joint)
+        {
+            int x = (int)joint.Position.X;
+            int y = (int)joint.Position.Y;
+            return new Point(x,y);
+        }
+
+        
+        void DrawSkeletonLine(SkeletonData skeleton,JointID[] joints,int length)
+        {
+            Point[] point = new Point[length];
+            Pen bluePen = new Pen(Color.LimeGreen, 3);
+            Graphics g2 = panel2.CreateGraphics();
+            for (int i = 0; i < length; i++)
+            {
+                var scaledJoint = skeleton.Joints[joints[i]].ScaleTo(640, 480);
+                point[i] = getJointPoint(scaledJoint);
+            }
+            g2.DrawLines(bluePen, point);
+        }
+         
+
+        void KinectDraw(Joint joint)
+        {
+            var scaledJoint = joint.ScaleTo(640, 480, 0.5f, 0.7f);
+            Graphics g = panel1.CreateGraphics();
+            if (draw == false)
+            {
+                oldx = scaledJoint.Position.X;
+                oldy = scaledJoint.Position.Y;
+                draw = true;
+            }
+            else
+            {
+                Pen blackPen = new Pen(Color.Black, 3);
+                float x1 = scaledJoint.Position.X;
+                float y1 = scaledJoint.Position.Y;
+                float x2 = oldx;
+                float y2 = oldy;
+                g.DrawLine(blackPen, x1, y1, x2, y2);
+                oldx = scaledJoint.Position.X;
+                oldy = scaledJoint.Position.Y;
+            }
+        }
+
+        private void btnExitClick(object sender, EventArgs e)
+        {
+            this.Close();
+            nui.Uninitialize();
+        }
+
+        private void btnClearClick(object sender, EventArgs e)
+        {
+            Graphics g1 = panel1.CreateGraphics();
+            g1.Clear(panel1.BackColor);
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            nui.Uninitialize();
+        }
+
+        private void Left_Click(object sender, EventArgs e)
+        {
+            LorR = false;
+            label1.Text = "  Left Handed";
+        }
+
+        private void Right_Click(object sender, EventArgs e)
+        {
+            LorR = true;
+            label1.Text = "Right Handed";
+        }
+        private void Start_Click(object sender, EventArgs e)
+        {
+            if (start)
+            {
+                start = false;
+                button3.Text = "Start";
+            }
+
+            else
+            {
+                start = true;
+                button3.Text = "Stop";
+            }
+        }
+    }
+}
+
+
